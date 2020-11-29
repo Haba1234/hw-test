@@ -11,7 +11,7 @@ import (
 func main() {
 	d := 1 * time.Second //Defining duration
 
-	// текущее время системы
+	// current time system
 	currentTime := time.Now()
 	fmt.Println("current time:", currentTime.Round(d))
 
