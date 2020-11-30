@@ -9,7 +9,8 @@ import (
 )
 
 func main() {
-	d := 1 * time.Second // Defining duration
+	// Defining duration
+	const d = time.Second
 
 	// current time system
 	currentTime := time.Now()
