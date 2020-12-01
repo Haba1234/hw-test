@@ -12,7 +12,7 @@ func main() {
 	// Defining duration
 	const d = time.Second
 
-	// current time system
+	// текущее время
 	currentTime := time.Now()
 	fmt.Println("current time:", currentTime.Round(d))
 
