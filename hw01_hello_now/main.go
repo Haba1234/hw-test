@@ -9,9 +9,10 @@ import (
 )
 
 func main() {
-	d := 1 * time.Second //Defining duration
+	// Defining duration
+	const d = time.Second
 
-	// текущее время системы
+	// текущее время
 	currentTime := time.Now()
 	fmt.Println("current time:", currentTime.Round(d))
 
