@@ -23,7 +23,7 @@ func checkSymbols(char rune) bool { //nolint:gofmt
 	return result
 }
 
-func Unpack(str string) (string, error) { //nolint:gocognit
+func Unpack(str string) (string, error) { //nolint:gocognit,funlen,gocyclo
 	var prevChar rune
 	var count int
 	var punct, double bool
