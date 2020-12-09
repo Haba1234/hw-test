@@ -81,6 +81,7 @@ func Unpack(str string) (string, error) { //nolint:gocognit,funlen,gocyclo
 		}
 		prevChar = char
 	}
+
 	if unicode.IsLetter(prevChar) || punct {
 		// сохранить последний символ в строке перед возвратом результата
 		multiChar(prevChar, 1)
