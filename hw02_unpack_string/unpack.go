@@ -8,29 +8,28 @@ import (
 )
 
 var ErrInvalidString = errors.New("invalid string")
-var resultStr strings.Builder //nolint:gofmt    // готовим построитель для новой строки
+var resultStr strings.Builder // готовим построитель для новой строки
 
-func multiChar(char rune, count int){ //nolint:goimports,gofmt
+func multiChar(char rune, count int) {
 	resultStr.WriteString(strings.Repeat(string(char), count))
 }
 
-// проверка, что символ соответствует разрешенному
-func checkSymbols(char rune) bool{
+func checkSymbols(char rune) bool { //nolint:gofmt
+	// проверка, что символ соответствует разрешенному.
 	result := true
-	if !unicode.IsLetter(char) && !unicode.IsDigit(char) && unicode.IsPunct(char) && (char != 92){
-			result = false
+	if !unicode.IsLetter(char) && !unicode.IsDigit(char) && unicode.IsPunct(char) && (char != 92) {
+		result = false
 	}
 	return result
 }
 
-//nolint:funlen
-func Unpack(str string) (string, error) {
+func Unpack(str string) (string, error) { //nolint:gocognit
 	var prevChar rune
 	var count int
 	var punct, double bool
 
 	resultStr.Reset()
-	
+
 	// если строка пустая, сразу на выход
 	if len(str) == 0 {
 		return "", nil
@@ -39,11 +38,11 @@ func Unpack(str string) (string, error) {
 	// перебор символов строки
 	for index, char := range str {
 		// неразрешенный символ
-		if !checkSymbols(char){
+		if !checkSymbols(char) {
 			return "", ErrInvalidString
 		}
 		// строка начинается с цифры или \ - ошибка
-		if index == 0 && (unicode.IsDigit(char) || unicode.IsPunct(char)){
+		if index == 0 && (unicode.IsDigit(char) || unicode.IsPunct(char)) {
 			return "", ErrInvalidString
 		}
 
@@ -82,7 +81,7 @@ func Unpack(str string) (string, error) {
 		}
 		prevChar = char
 	}
-	if unicode.IsLetter(prevChar) || punct{
+	if unicode.IsLetter(prevChar) || punct {
 		// сохранить последний символ в строке перед возвратом результата
 		multiChar(prevChar, 1)
 	}
