@@ -1,13 +1,11 @@
 package hw03_frequency_analysis //nolint:golint
-
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 // Change to true if needed
-var taskWithAsteriskIsCompleted = false
+var taskWithAsteriskIsCompleted = true
 
 var text = `Как видите, он  спускается  по  лестнице  вслед  за  своим
 	другом   Кристофером   Робином,   головой   вниз,  пересчитывая
@@ -43,9 +41,35 @@ var text = `Как видите, он  спускается  по  лестни�
 	посидеть у огня и послушать какую-нибудь интересную сказку.
 		В этот вечер...`
 
+var text2 = `1111111111111111111111111111111111111111111111111`
+
+var text3 = `Жили-были старик со старухой.`
+
+var text4 = `\\\54gf юра.
+	/+ \000rffr как\
+		екепкеп тест вроде '''/.rrg вроде
+\а-тут 1будет ;6какая: то-' проверка...
+			еще-; раз:ный текст fgtr() жила ,т.бабка
+еще-; раз:ный как текст ..юра1 fgtr() жила ,т.бабка
+		еще-; раз:ный текст fgtr() жила ,т.бабка
+	еще-; раз:ный текст fgtr() жила ,т.бабка какая:`
+
 func TestTop10(t *testing.T) {
 	t.Run("no words in empty string", func(t *testing.T) {
 		require.Len(t, Top10(""), 0)
+	})
+
+	t.Run("text from numbers", func(t *testing.T) {
+		require.Nil(t, Top10(text2))
+	})
+
+	t.Run("short text", func(t *testing.T) {
+		require.Nil(t, Top10(text3))
+	})
+
+	t.Run("garbage text", func(t *testing.T) {
+		expected := []string{"ный", "раз", "т", "текст", "жила", "бабка", "еще-", "юра", "вроде", "как", "какая"}
+		require.Subset(t, expected, Top10(text4))
 	})
 
 	t.Run("positive test", func(t *testing.T) {
