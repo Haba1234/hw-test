@@ -1,12 +1,12 @@
 package hw04_lru_cache //nolint:golint,stylecheck
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/require"
 	"math/rand"
 	"strconv"
 	"sync"
 	"testing"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestCache(t *testing.T) {
@@ -51,11 +51,41 @@ func TestCache(t *testing.T) {
 
 	t.Run("purge logic", func(t *testing.T) {
 		// Write me
+		c := NewCache(3)
+		wasInCache := c.Set("Clear", 100)
+		require.False(t, wasInCache)
+
+		c.Clear()
+		val, ok := c.Get("Clear")
+		require.False(t, ok)
+		require.Nil(t, val)
+
+		for _, v := range [...]int{1, 2, 3} {
+			wasInCache = c.Set(Key(fmt.Sprint(v)), v)
+		} // [1, 2, 3]
+		wasInCache = c.Set("4", 4) // [2, 3, 4]
+		val, ok = c.Get("1")
+		require.False(t, ok)
+		require.Nil(t, val)
+
+		rand.Seed(1)
+		for _, v := range [...]int{2, 3, 3, 4, 3, 3, 4, 2, 4, 3} {
+			if rand.Int() > 0 {
+				wasInCache = c.Set(Key(fmt.Sprint(v)), v)
+			} else {
+				val, ok = c.Get(Key(fmt.Sprint(v)))
+			}
+		} // [3, 4, 2]
+		wasInCache = c.Set("5", 5) // [5, 3, 4]
+		val, ok = c.Get("2")
+		require.False(t, ok)
+		require.Nil(t, val)
+
 	})
 }
 
 func TestCacheMultithreading(t *testing.T) {
-	t.Skip() // NeedRemove if task with asterisk completed
+	//t.Skip() // NeedRemove if task with asterisk completed
 
 	c := NewCache(10)
 	wg := &sync.WaitGroup{}
