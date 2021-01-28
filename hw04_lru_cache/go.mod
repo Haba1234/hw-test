@@ -1,4 +1,4 @@
-module github.com/Haba1234/hw04_lru_cache
+module github.com/Haba1234/hw-test/hw04_lru_cache
 
 go 1.15
 
