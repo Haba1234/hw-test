@@ -26,7 +26,7 @@ type cacheItem struct {
 
 func NewCache(capacity int) (Cache, error) {
 	if capacity <= 0 {
-		err := errors.New("Capacity <= 0")
+		err := errors.New("capacity set equal to or less than zero")
 		return nil, err
 	}
 	return &lruCache{
