@@ -80,7 +80,5 @@ func (lru *lruCache) Clear() {
 	defer lru.mx.Unlock() // выключаем защиту перед выходом из функции.
 
 	lru.items = make(map[Key]*ListItem, lru.capacity) // очистка кэша.
-	for i := 0; i < lru.queue.Len(); i++ {            // очистка очереди.
-		lru.queue.Remove(lru.queue.Back())
-	}
+	lru.queue = NewList()                             // очистка очереди.
 }
