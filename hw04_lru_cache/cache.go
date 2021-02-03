@@ -1,5 +1,6 @@
 package hw04_lru_cache //nolint:golint,stylecheck
 import (
+	"errors"
 	"sync"
 )
 
@@ -23,12 +24,16 @@ type cacheItem struct {
 	value interface{}
 }
 
-func NewCache(capacity int) Cache {
+func NewCache(capacity int) (Cache, error) {
+	if capacity <= 0 {
+		err := errors.New("Capacity <= 0")
+		return nil, err
+	}
 	return &lruCache{
 		capacity: capacity,
 		queue:    NewList(),
 		items:    make(map[Key]*ListItem, capacity),
-	}
+	}, nil
 }
 
 // Добавить значение в кэш по ключу.
