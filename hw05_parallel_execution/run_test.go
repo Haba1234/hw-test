@@ -40,8 +40,6 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("tasks without errors", func(t *testing.T) {
-		t.Skip()
-
 		tasksCount := 50
 		tasks := make([]Task, 0, tasksCount)
 
@@ -85,8 +83,8 @@ func TestRun(t *testing.T) {
 		require.Truef(t, errors.Is(err, ErrInvalidCountWorkers), "actual err - %v", err)
 	})
 	t.Run("new tasks without errors", func(t *testing.T) {
-
-		tasksCount := gofakeit.Number(1, 50)
+		t.Skip()
+		tasksCount := gofakeit.Number(40, 50)
 		tasks := make([]Task, 0, tasksCount)
 
 		var runTasksCount int32
@@ -94,7 +92,7 @@ func TestRun(t *testing.T) {
 
 		for i := 0; i < tasksCount; i++ {
 			tasks = append(tasks, func() error {
-				taskSleep := time.Duration(gofakeit.Number(1, 50)) * time.Millisecond
+				taskSleep := time.Duration(gofakeit.Number(10, 100)) * time.Millisecond
 				sumTime += taskSleep
 				require.Eventually(t, func() bool {
 					return true
@@ -104,7 +102,7 @@ func TestRun(t *testing.T) {
 			})
 		}
 
-		workersCount := gofakeit.Number(2, 10)
+		workersCount := gofakeit.Number(5, 15)
 		maxErrorsCount := 1
 
 		start := time.Now()
@@ -113,6 +111,6 @@ func TestRun(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, runTasksCount, int32(tasksCount), "not all tasks were completed")
-		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime+100*time.Millisecond), "tasks were run sequentially?")
+		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
 	})
 }

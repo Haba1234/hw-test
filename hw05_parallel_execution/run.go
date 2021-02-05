@@ -10,65 +10,88 @@ var ErrInvalidCountWorkers = errors.New("invalid count of workers")
 
 type Task func() error
 
-// Функция запуска воркеров.
-func startGo(tasks []Task, wg *sync.WaitGroup, chNumTask chan int, chErr chan error) {
+// Запуск воркеров.
+func startWorkers(wg *sync.WaitGroup, chTask <-chan Task, chErr chan<- error, done chan<- bool, stop <-chan bool) {
 	defer wg.Done()
+
+Loop:
 	for {
-		num, ok := <-chNumTask // ждем номер следующей задачи.
-		if !ok {
-			return // Канал с задачами закрыт. Завершаем работу.
+		select {
+		case <-stop:
+			break Loop
+		case task := <-chTask:
+			err := task()
+			chErr <- err
 		}
-		err := tasks[num]()
-		chErr <- err // пишем результат в канал.
+	}
+	done <- true
+}
+
+func startProduser(tasks []Task, wg *sync.WaitGroup, chTask chan<- Task, stop <-chan bool) {
+	defer wg.Done()
+	for _, task := range tasks {
+		select {
+		case <-stop:
+			return
+		case chTask <- task:
+		}
 	}
 }
 
 // Run starts tasks in n goroutines and stops its work when receiving m errors from tasks.
 func Run(tasks []Task, n int, m int) error {
-	// Проверка, если m меньше 1, то возвращаем ошибку.
 	if m <= 0 {
 		return ErrErrorsLimitExceeded
 	}
-	// Проверка, если n меньше 1, то возвращаем ошибку.
 	if n <= 0 {
 		return ErrInvalidCountWorkers
 	}
-	// Открываем канал для приема результатов выполнения задач.
-	var chErr = make(chan error, n)
+
+	var chTask = make(chan Task) // канал для выдачи задач.
+	var chErr = make(chan error) // канал для приема результатов выполнения задач.
+	var stop = make(chan bool)
+	var done = make(chan bool, n)
+	defer close(chTask)
 	defer close(chErr)
-
-	// Открываем канал для выдачи номеров задач.
-	var chNumTask = make(chan int, n)
-
-	currentTask := 0 // Подсчет кол-ва выполненных задач.
+	defer close(done)
 
 	wg := sync.WaitGroup{}
 	wg.Add(n)
-	// Запускаем n воркеров.
+
 	for i := 0; i < n; i++ {
-		go startGo(tasks, &wg, chNumTask, chErr)
+		go startWorkers(&wg, chTask, chErr, done, stop)
 	}
 
-	countErr := 0 // Кол-во задач с ошибками.
+	wg.Add(1)
+	go startProduser(tasks, &wg, chTask, stop)
 	// В цикле читаем результаты выполнения задач из канала chErr,
-	// подсчитываем кол-во ошибок и
-	// раздаем новые задачи освободившимся воркерам через канал currentTask.
-	for currentTask < len(tasks) {
-		chNumTask <- currentTask // Новая задача.
-		currentTask++
-		if err := <-chErr; true {
+	// подсчитываем кол-во ошибок и выполненных задач.
+	countErr := 0
+	doneWorkers := 0
+	doneTasks := 0
+	flag := false
+Loop:
+	for {
+		select {
+		case err := <-chErr:
 			if err != nil {
 				countErr++
+			} else {
+				doneTasks++
 			}
-			if countErr >= m { // Достигнут предел максимального кол-ва ошибок.
-				break
+			if (countErr >= m || countErr >= len(tasks) || doneTasks >= len(tasks)) && !flag {
+				close(stop)
+				flag = true
+			}
+		case <-done:
+			doneWorkers++
+			if doneWorkers >= n {
+				break Loop
 			}
 		}
 	}
-	// Подаем сигнал воркерам на прекращение работы.
-	close(chNumTask)
 
-	wg.Wait() // Ожидаем завершение всех запущенных воркеров.
+	wg.Wait()
 
 	// Возврат ошибки, если кол-во задач с ошибками >= m.
 	if countErr >= m {
