@@ -94,7 +94,7 @@ Loop:
 	wg.Wait()
 
 	// Возврат ошибки, если кол-во задач с ошибками >= m.
-	if countErr >= m { //nolint:ifshort
+	if countErr >= m && doneWorkers == n {
 		return ErrErrorsLimitExceeded
 	}
 
