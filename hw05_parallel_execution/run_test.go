@@ -3,12 +3,12 @@ package hw05_parallel_execution //nolint:golint,stylecheck
 import (
 	"errors"
 	"fmt"
+	"github.com/brianvoe/gofakeit/v6"
 	"math/rand"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
@@ -84,16 +84,16 @@ func TestRun(t *testing.T) {
 	})
 	t.Run("new tasks without errors", func(t *testing.T) {
 		t.Skip()
-		tasksCount := gofakeit.Number(40, 50)
+		tasksCount := gofakeit.Number(10, 50)
 		tasks := make([]Task, 0, tasksCount)
 
 		var runTasksCount int32
 		var sumTime time.Duration
 
 		for i := 0; i < tasksCount; i++ {
+			taskSleep := time.Duration(gofakeit.Number(10, 100)) * time.Millisecond
+			sumTime += taskSleep
 			tasks = append(tasks, func() error {
-				taskSleep := time.Duration(gofakeit.Number(10, 100)) * time.Millisecond
-				sumTime += taskSleep
 				require.Eventually(t, func() bool {
 					return true
 				}, time.Second, taskSleep)
@@ -102,7 +102,7 @@ func TestRun(t *testing.T) {
 			})
 		}
 
-		workersCount := gofakeit.Number(5, 15)
+		workersCount := gofakeit.Number(2, 5)
 		maxErrorsCount := 1
 
 		start := time.Now()
