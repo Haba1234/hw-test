@@ -24,7 +24,6 @@ func startWorkers(wg *sync.WaitGroup, chTask <-chan Task, chErr chan<- error, do
 }
 
 // Run starts tasks in n goroutines and stops its work when receiving m errors from tasks.
-//nolint:gocognit
 func Run(tasks []Task, n int, m int) error {
 	if m <= 0 {
 		return ErrErrorsLimitExceeded
