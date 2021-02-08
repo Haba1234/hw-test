@@ -83,8 +83,7 @@ func TestRun(t *testing.T) {
 		require.Truef(t, errors.Is(err, ErrInvalidCountWorkers), "actual err - %v", err)
 	})
 	t.Run("new tasks without errors", func(t *testing.T) {
-		t.Skip()
-		tasksCount := gofakeit.Number(10, 50)
+		tasksCount := 50
 		tasks := make([]Task, 0, tasksCount)
 
 		var runTasksCount int32
@@ -102,7 +101,7 @@ func TestRun(t *testing.T) {
 			})
 		}
 
-		workersCount := gofakeit.Number(2, 5)
+		workersCount := 5
 		maxErrorsCount := 1
 
 		start := time.Now()
