@@ -11,12 +11,15 @@ var ErrInvalidCountWorkers = errors.New("invalid count of workers")
 type Task func() error
 
 // Запуск воркеров.
-func startWorkers(wg *sync.WaitGroup, chTask <-chan Task, chErr chan<- error) {
+func startWorkers(wg *sync.WaitGroup, chTask <-chan Task, chErr chan<- error, done <-chan struct{}) {
 	defer wg.Done()
 
 	for task := range chTask {
-		err := task()
-		chErr <- err
+		select {
+		case <-done:
+			return
+		case chErr <- task():
+		}
 	}
 }
 
@@ -30,41 +33,33 @@ func Run(tasks []Task, n int, m int) error {
 		return ErrInvalidCountWorkers
 	}
 
-	var chTask = make(chan Task, 1) // Канал для выдачи задач.
-	var chErr = make(chan error)    // Канал для приема результатов выполнения задач.
+	var chTask = make(chan Task) // Канал для выдачи задач.
+	var chErr = make(chan error) // Канал для приема результатов выполнения задач.
+	var done = make(chan struct{})
 	defer close(chErr)
 
 	wg := sync.WaitGroup{}
 	wg.Add(n)
 
 	for i := 0; i < n; i++ {
-		go startWorkers(&wg, chTask, chErr)
+		go startWorkers(&wg, chTask, chErr, done)
 	}
 
-	countTasksOK := 0  // Выполнено задач успешно.
 	countTasksErr := 0 // Выполнено задач с ошибкой.
 	issuedTasks := 0   // Выдано задач.
-	flag := false
-	for (countTasksOK + countTasksErr) < len(tasks) {
+
+	for {
 		select {
 		case result := <-chErr: // прием результатов работы воркера.
-			if result == nil {
-				countTasksOK++
-			} else {
+			if result != nil {
 				countTasksErr++
 			}
-			if (countTasksErr >= m || issuedTasks == len(tasks)) && !flag {
-				flag = true
-				close(chTask)
-			}
-		default: // Выдача задач.
-			if len(chTask) == 0 && issuedTasks < len(tasks) && countTasksErr < m {
-				chTask <- tasks[issuedTasks]
-				issuedTasks++
-			}
+		case chTask <- tasks[issuedTasks]: // Раздача новых задач.
+			issuedTasks++
 		}
-		// все выданные задачи выполнены?
-		if countTasksOK+countTasksErr == issuedTasks && countTasksErr > 1 {
+		if countTasksErr >= m || issuedTasks == len(tasks) {
+			close(chTask)
+			close(done)
 			break
 		}
 	}
@@ -75,6 +70,5 @@ func Run(tasks []Task, n int, m int) error {
 	if countTasksErr >= m {
 		return ErrErrorsLimitExceeded
 	}
-
 	return nil
 }
