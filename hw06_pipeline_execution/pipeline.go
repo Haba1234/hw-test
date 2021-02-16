@@ -18,15 +18,15 @@ func ExecutePipeline(in In, done In, stages ...Stage) Out {
 	stageFn := func(chIn In) {
 		defer wg.Done()
 
-		resultStage := chIn
+		chResultStage := chIn
 		// запуск переданных stages.
-		for i := 0; i < len(stages); i++ {
-			resultStage = stages[i](resultStage)
+		for _, stage := range stages {
+			chResultStage = stage(chResultStage)
 		}
 
 		select {
 		case <-done:
-		case result := <-resultStage: // ждем результат выполнения stages.
+		case result := <-chResultStage: // ждем результат выполнения stages.
 			select {
 			case <-done:
 			case out <- result:
