@@ -20,8 +20,8 @@ func ExecutePipeline(in In, done In, stages ...Stage) Out {
 
 		resultStage := chIn
 		// запуск переданных stages.
-		for i := 0; i < len(stages); i++ {
-			resultStage = stages[i](resultStage)
+		for _, stage := range stages {
+			resultStage = stage(resultStage)
 		}
 
 		select {
