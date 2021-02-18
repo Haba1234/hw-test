@@ -48,21 +48,21 @@ func (bar *progressBar) increment(cur int64) {
 		bar.rate += strings.Repeat(bar.symbol, bar.repeatSymbol)
 	}
 
-	fmt.Printf("\r[%-50s]%3d%% %8d/%d", bar.rate, bar.percent, bar.cur, bar.total)
+	fmt.Printf("\r[%-50s]%3d%% %8d/%d", bar.rate, bar.percent, bar.cur, bar.total) //nolint:forbidigo
 }
 
 func (bar *progressBar) finish(textMsg string, duration time.Duration) {
-	fmt.Println()
-	fmt.Println(textMsg)
-	fmt.Printf("Total: %d/%d bytes, copy time: %v\n", bar.cur, bar.total, duration)
+	fmt.Println()                                                                   //nolint:forbidigo
+	fmt.Println(textMsg)                                                            //nolint:forbidigo
+	fmt.Printf("Total: %d/%d bytes, copy time: %v\n", bar.cur, bar.total, duration) //nolint:forbidigo
 }
 
+//nolint:funlen,cyclop
 func Copy(fromPath, toPath string, offset, limit int64) error {
 	// Проверка на неверные ключи.
 	if len(fromPath) == 0 {
 		return fmt.Errorf("%w. Wrong key 'from': %q", ErrUnsupportedFile, fromPath)
 	}
-
 	if len(toPath) == 0 {
 		return fmt.Errorf("%w. Wrong key 'to': %q", ErrUnsupportedFile, toPath)
 	}
@@ -73,7 +73,7 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	}
 	defer f.Close()
 
-	c, err := os.OpenFile(toPath, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	c, err := os.OpenFile(toPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -86,11 +86,10 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	sizeFile := info.Size()
 
 	if sizeFile == 0 {
-		return fmt.Errorf("%w. Wrong key 'from': %q, unknown file length.", ErrUnsupportedFile, fromPath)
+		return fmt.Errorf("wrong key 'from': %q, unknown file length. %w ", fromPath, ErrUnsupportedFile)
 	}
-
 	if offset > sizeFile {
-		return fmt.Errorf("%w. Wrong key 'offset' = %d, file size = %d", ErrOffsetExceedsFileSize, offset, sizeFile)
+		return fmt.Errorf("wrong key 'offset' = %d, file size = %d. %w ", offset, sizeFile, ErrOffsetExceedsFileSize)
 	}
 	if offset > 0 {
 		_, err = f.Seek(offset, 0)
@@ -98,15 +97,12 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 			return err
 		}
 	}
-
 	if limit == 0 {
 		limit = sizeFile
 	}
 
-	fmt.Println("Start copy...")
 	var bar progressBar
 	bar.option(0, limit, "#")
-
 	start := time.Now()
 	for i := int64(1); i <= limit; i++ {
 		_, err = io.CopyN(c, f, 1)
@@ -117,7 +113,6 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		bar.increment(i)
 	}
 	duration := time.Since(start)
-
 	text := "Copy finish!"
 	if errors.Is(err, io.EOF) {
 		text = "End of file reached!"

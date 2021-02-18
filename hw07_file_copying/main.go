@@ -23,6 +23,6 @@ func main() {
 	err := Copy(from, to, offset, limit)
 
 	if err != nil {
-		fmt.Println("Error:", err)
+		fmt.Println("Error:", err) //nolint:forbidigo
 	}
 }
