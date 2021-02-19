@@ -1,7 +1,9 @@
 package hw05_parallel_execution //nolint:golint,stylecheck
 
 import (
+	"errors"
 	"fmt"
+	"github.com/brianvoe/gofakeit/v6"
 	"math/rand"
 	"sync/atomic"
 	"testing"
@@ -31,9 +33,9 @@ func TestRun(t *testing.T) {
 
 		workersCount := 10
 		maxErrorsCount := 23
-		result := Run(tasks, workersCount, maxErrorsCount)
+		err := Run(tasks, workersCount, maxErrorsCount)
 
-		require.Equal(t, ErrErrorsLimitExceeded, result)
+		require.Truef(t, errors.Is(err, ErrErrorsLimitExceeded), "actual err - %v", err)
 		require.LessOrEqual(t, runTasksCount, int32(workersCount+maxErrorsCount), "extra tasks were started")
 	})
 
@@ -59,9 +61,53 @@ func TestRun(t *testing.T) {
 		maxErrorsCount := 1
 
 		start := time.Now()
-		result := Run(tasks, workersCount, maxErrorsCount)
+		err := Run(tasks, workersCount, maxErrorsCount)
 		elapsedTime := time.Since(start)
-		require.Nil(t, result)
+		require.NoError(t, err)
+
+		require.Equal(t, runTasksCount, int32(tasksCount), "not all tasks were completed")
+		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
+	})
+	t.Run("tasks various errors", func(t *testing.T) {
+		tasksCount := 50
+		tasks := make([]Task, 0, tasksCount)
+
+		workersCount := 10
+		maxErrorsCount := 0
+		err := Run(tasks, workersCount, maxErrorsCount)
+		require.Truef(t, errors.Is(err, ErrErrorsLimitExceeded), "actual err - %v", err)
+
+		workersCount = 0
+		maxErrorsCount = 5
+		err = Run(tasks, workersCount, maxErrorsCount)
+		require.Truef(t, errors.Is(err, ErrInvalidCountWorkers), "actual err - %v", err)
+	})
+	t.Run("new tasks without errors", func(t *testing.T) {
+		tasksCount := 50
+		tasks := make([]Task, 0, tasksCount)
+
+		var runTasksCount int32
+		var sumTime time.Duration
+
+		for i := 0; i < tasksCount; i++ {
+			taskSleep := time.Duration(gofakeit.Number(10, 100)) * time.Millisecond
+			sumTime += taskSleep
+			tasks = append(tasks, func() error {
+				require.Eventually(t, func() bool {
+					return true
+				}, time.Second, taskSleep)
+				atomic.AddInt32(&runTasksCount, 1)
+				return nil
+			})
+		}
+
+		workersCount := 5
+		maxErrorsCount := 1
+
+		start := time.Now()
+		err := Run(tasks, workersCount, maxErrorsCount)
+		elapsedTime := time.Since(start)
+		require.NoError(t, err)
 
 		require.Equal(t, runTasksCount, int32(tasksCount), "not all tasks were completed")
 		require.LessOrEqual(t, int64(elapsedTime), int64(sumTime/2), "tasks were run sequentially?")
