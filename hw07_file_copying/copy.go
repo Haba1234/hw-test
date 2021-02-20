@@ -21,18 +21,22 @@ type progressBar struct {
 	total        int64  // Всего надо выполнить.
 	rate         string // Текущая позиция символа.
 	symbol       string // Символ заполнения.
-	repeatSymbol int    // Кол-во повторов символа, если total < 50.
+	repeatSymbol int    // Кол-во повторов символа, если total < lenBar.
 }
 
-func (bar *progressBar) option(start, total int64, symbol string) {
-	bar.cur = start
-	bar.total = total
-	bar.symbol = symbol
+const lenBar = 50 // Длина в символах progressBar.
 
-	// Пересчет шкалы, если байт для копирования меньше 50 (50 - длина progress Bar).
-	bar.repeatSymbol = 1
-	if total < 50 {
-		bar.repeatSymbol = int(math.Round(50 / float64(total)))
+func newOption(start, total int64, symbol string) *progressBar {
+	// Пересчет шкалы, если байт для копирования меньше lenBar (lenBar - длина progress Bar).
+	repeatSymbol := 1
+	if total < lenBar {
+		repeatSymbol = int(math.Round(lenBar / float64(total)))
+	}
+	return &progressBar{
+		cur:          start,
+		total:        total,
+		symbol:       symbol,
+		repeatSymbol: repeatSymbol,
 	}
 }
 
@@ -73,12 +77,6 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	}
 	defer f.Close()
 
-	c, err := os.OpenFile(toPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
 	info, err := f.Stat()
 	if err != nil {
 		return err
@@ -101,8 +99,13 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 		limit = sizeFile
 	}
 
-	var bar progressBar
-	bar.option(0, limit, "#")
+	c, err := os.OpenFile(toPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	bar := newOption(0, limit, "#")
 	start := time.Now()
 	for i := int64(1); i <= limit; i++ {
 		_, err = io.CopyN(c, f, 1)
@@ -114,12 +117,15 @@ func Copy(fromPath, toPath string, offset, limit int64) error {
 	}
 	duration := time.Since(start)
 	text := "Copy finish!"
-	if errors.Is(err, io.EOF) {
-		text = "End of file reached!"
+
+	if err != nil {
+		if errors.Is(err, io.EOF) {
+			text = "End of file reached!"
+		} else {
+			text = "Copy error!"
+		}
 	}
-	if err != nil && !errors.Is(err, io.EOF) {
-		text = "Copy error!"
-	}
+
 	bar.finish(text, duration)
 
 	if !errors.Is(err, io.EOF) {
