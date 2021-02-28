@@ -17,12 +17,12 @@ func TestReadDir(t *testing.T) {
 	expected["HELLO"] = EnvValue{"\"hello\"", false}
 	expected["UNSET"] = EnvValue{"", true}
 
+	const dir = "./testdata/env"
+
 	f := func(t *testing.T) {
-		dir := "./testdata/env"
 		mapEnv, err := ReadDir(dir)
 		require.Nil(t, err)
 		require.Equal(t, expected, mapEnv, "maps don't match")
-
 	}
 	t.Run("map comparison", f)
 
