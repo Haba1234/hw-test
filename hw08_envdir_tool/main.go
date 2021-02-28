@@ -1,5 +1,22 @@
 package main
 
+import (
+	"fmt"
+	"os"
+)
+
 func main() {
-	// Place your code here.
+	if len(os.Args) > 2 {
+		dirEnv := os.Args[1]
+		mapEnv, err := ReadDir(dirEnv)
+		if err != nil {
+			fmt.Printf("Ошибка чтения каталога %s. Error: %v\n", dirEnv, err) //nolint:forbidigo
+			os.Exit(1)
+		}
+		code := RunCmd(os.Args[2:], mapEnv)
+		os.Exit(code)
+	} else {
+		fmt.Println("Не верно заданы ключи") //nolint:forbidigo
+		os.Exit(1)
+	}
 }
