@@ -2,6 +2,7 @@ package hw09structvalidator
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -42,10 +43,14 @@ func TestValidate(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			// Place your code here.
+			in: Response{Code: 100,
+				Body: "rerferf",
+			},
+			expectedErr: ValidationErrors{ValidationError{
+				Field: "Code",
+				Err:   ErrFieldWrong,
+			}},
 		},
-		// ...
-		// Place your code here.
 	}
 
 	for i, tt := range tests {
@@ -54,6 +59,12 @@ func TestValidate(t *testing.T) {
 			t.Parallel()
 
 			// Place your code here.
+			err := Validate(tt.in)
+			fmt.Printf("Test. Errors: %+v, %T\n", err, err)
+			fmt.Printf("Test1. Errors: %+v, %T\n", tt.expectedErr, tt.expectedErr)
+			if errors.Is(err, tt.expectedErr) {
+				fmt.Println("Есть ошибка")
+			}
 			_ = tt
 		})
 	}
