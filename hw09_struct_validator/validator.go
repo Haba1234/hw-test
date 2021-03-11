@@ -9,8 +9,10 @@ import (
 	"strings"
 )
 
-var ErrValidateWrong = errors.New("validate wrong")
-var ErrFieldWrong = errors.New("field wrong")
+var (
+	ErrValidateWrong = errors.New("validate wrong")
+	ErrValidate      = errors.New("validated error")
+)
 
 type ValidationError struct {
 	Field string
@@ -20,181 +22,185 @@ type ValidationError struct {
 type ValidationErrors []ValidationError
 
 func (v ValidationErrors) Error() string {
-	/*var errStr string
-	for _, err := range v{
-		errStr += fmt.Sprintf("Field: %s: %s\n", err.Field, err.Err)
+	var errStr string
+	for _, err := range v {
+		// Оставляем только ошибки валидации
+		if errors.Is(err.Err, ErrValidate) {
+			errStr += fmt.Sprintf("Field: %s: %s\n", err.Field, err.Err)
+		}
 	}
-	return errStr*/
-
-	var b []error
-	for _, val := range v {
-		b = append(b, fmt.Errorf("%s: %w\n", val.Field, val.Err))
-	}
-
-	return fmt.Sprintf("%v", b)
+	return errStr
 }
 
-type fieldTag struct {
+type fieldT struct {
 	fieldName string
 	fieldVal  reflect.Value
 	tagVal    reflect.StructTag
 }
 
+// Добавляет найденные ошибки в слайс.
+func (field fieldT) appendValidateErr(errValid *ValidationErrors, err error) {
+	if err != nil {
+		*errValid = append(*errValid, ValidationError{
+			Field: field.fieldName,
+			Err:   err,
+		})
+	}
+}
+
 // Проверка строки по ключу 'len:xxx'.
-func validateKeyLen(s string, key string) error {
+func (field fieldT) validateKeyLen(errValid *ValidationErrors, key string) {
+	slice := reflect.ValueOf([]string{})
+	// определяем тип данных: слайс или нет.
+	switch field.fieldVal.Kind() {
+	case reflect.String:
+		slice = reflect.Append(slice, field.fieldVal)
+	case reflect.Slice:
+		slice = reflect.AppendSlice(slice, field.fieldVal.Slice(0, field.fieldVal.Len()))
+	default:
+		field.appendValidateErr(errValid, ErrValidateWrong)
+		return
+	}
+
 	valKey, err := strconv.Atoi(regexp.MustCompile(`([0-9]+)`).FindString(key))
 	if err != nil {
-		return err
+		field.appendValidateErr(errValid, err)
+		return
 	}
-	fmt.Printf("valKey: %v\n", valKey)
-	if valKey < 0 {
-		return ErrValidateWrong
+	for i := 0; i < slice.Len(); i++ {
+		v := slice.Index(i)
+		switch {
+		case valKey < 0:
+			field.appendValidateErr(errValid, ErrValidateWrong)
+		case len(v.String()) != valKey:
+			field.appendValidateErr(errValid, ErrValidate)
+		}
 	}
-	if len(s) != valKey {
-		return ErrFieldWrong
-	}
-	return nil
 }
 
 // Проверка на вхождение строки в множество строк. Ключ 'in:foo,bar'.
-func validateKeyIn(value interface{}, key string) error {
-	arrayStr := regexp.MustCompile(`(in:|,)`).Split(key, -1)
-	arrayStr = arrayStr[1:]
-	fmt.Println("arrayStr:", arrayStr)
-	val := reflect.ValueOf(value)
-	if val.Kind() == reflect.Int64 {
-		for _, v := range arrayStr {
-			tmp, err := strconv.Atoi(v)
-			if err != nil {
-				return err
-			}
-			if int64(tmp) == val.Int() {
-				return nil
-			}
-		}
+func (field fieldT) validateKeyIn(errValid *ValidationErrors, key string) {
+	slice := reflect.ValueOf([]string{})
+	// определяем тип данных: слайс или нет.
+	switch field.fieldVal.Kind() {
+	case reflect.String:
+		slice = reflect.Append(slice, reflect.ValueOf(field.fieldVal.String()))
+	case reflect.Int:
+		slice = reflect.ValueOf([]int{})
+		slice = reflect.Append(slice, field.fieldVal)
+	case reflect.Slice:
+		slice = reflect.AppendSlice(slice, field.fieldVal.Slice(0, field.fieldVal.Len()))
+	default:
+		field.appendValidateErr(errValid, ErrValidateWrong)
+		return
 	}
 
-	if val.Kind() == reflect.String {
-		for _, v := range arrayStr {
-			if v == val.String() {
-				return nil
+	arrayKey := regexp.MustCompile(`(in:|,)`).Split(key, -1)
+	if len(arrayKey) < 2 {
+		field.appendValidateErr(errValid, ErrValidateWrong)
+		return
+	}
+	arrayKey = arrayKey[1:]
+
+	var valResult string
+	// Проходим по слайсу значений.
+	for i := 0; i < slice.Len(); i++ {
+		val := slice.Index(i)
+
+		switch val.Kind() {
+		case reflect.String:
+			valResult = val.String()
+		case reflect.Int:
+			valResult = strconv.Itoa(int(val.Int()))
+		default:
+			field.appendValidateErr(errValid, ErrValidateWrong)
+			return
+		}
+		// Сравниваем значение с ключом.
+		keyOK := true
+		for _, k := range arrayKey {
+			if k == valResult {
+				keyOK = false
+				break
 			}
 		}
+		if keyOK {
+			field.appendValidateErr(errValid, ErrValidate)
+		}
 	}
-	return ErrFieldWrong
 }
 
 // Проверка строки по ключу 'regexp:...'.
-func validateKeyRegexp(s string, key string) error {
-	re := regexp.MustCompile(`[^regexp:].*`).FindString(key)
-	result, err := regexp.MatchString(re, s)
-	fmt.Println(result, err)
-	if err != nil {
-		return err
-	}
-	if !result {
-		return ErrFieldWrong
+func (field fieldT) validateKeyRegexp(key string) error {
+	if field.fieldVal.Kind() == reflect.String {
+		re := regexp.MustCompile(`[^regexp:].*`).FindString(key)
+		result, err := regexp.MatchString(re, field.fieldVal.String())
+		if err != nil {
+			return err
+		}
+		if !result {
+			return ErrValidate
+		}
 	}
 	return nil
 }
 
 // Проверка числа на минимум, максимум Ключи 'min', 'max'.
 // less = true - проверка на минимум.
-func validateKeyMinMax(val int64, key string, less bool) error {
-	valKey, err := strconv.Atoi(regexp.MustCompile(`([0-9]+)`).FindString(key))
-	if err != nil {
-		return err
-	}
-	fmt.Printf("valKey: %v\n", valKey)
-	if less && val < int64(valKey) || !less && val > int64(valKey) {
-		return ErrFieldWrong
+func (field fieldT) validateKeyMinMax(key string, less bool) error {
+	if field.fieldVal.Kind() == reflect.Int {
+		valKey, err := strconv.Atoi(regexp.MustCompile(`([0-9]+)`).FindString(key))
+		if err != nil {
+			return err
+		}
+
+		if less && field.fieldVal.Int() < int64(valKey) || !less && field.fieldVal.Int() > int64(valKey) {
+			return ErrValidate
+		}
 	}
 	return nil
 }
 
-// Парсим Tag и анализируем с типом поля
-func (fl fieldTag) parsing(errValid *ValidationErrors) {
+// Парсим Tag и анализируем с типом поля.
+func (field fieldT) parsing(errValid *ValidationErrors) {
 	var err error
-	if keys, ok := fl.tagVal.Lookup("validate"); ok {
-		if keys == "" {
-			fmt.Println("(пустой тег)") // Добавить в ошибку
-		} else {
-			fmt.Println("Tag keys:", keys)
-			fmt.Println(fl.fieldVal.Kind())
-			// type string
-			if fl.fieldVal.Kind() == reflect.String {
-				// Выделение и проверка валидаторов.
-				for _, key := range strings.Split(keys, "|") {
-					switch {
-					case strings.Contains(key, "len:"):
-						err = validateKeyLen(fl.fieldVal.String(), key)
-						fmt.Println("!!!result!!!", err)
-					case strings.Contains(key, "regexp:"):
-						err = validateKeyRegexp(fl.fieldVal.String(), key)
-						fmt.Println("!!!result!!!", err)
-					case strings.Contains(key, "in:"):
-						err = validateKeyIn(fl.fieldVal.String(), key)
-						fmt.Println("!!!result!!!", err)
-					default:
-						fmt.Println("Неправильный валидатор!!!")
-					}
-					fmt.Printf("error: %v\n", err)
-					if err != nil {
-						*errValid = append(*errValid, ValidationError{
-							Field: fl.fieldName,
-							Err:   err,
-						})
-					}
-					fmt.Println("errValid:", errValid)
-				}
+	if keys, ok := field.tagVal.Lookup("validate"); ok && keys != "" {
+		// Выделение и проверка валидаторов.
+		for _, key := range strings.Split(keys, "|") {
+			switch {
+			case strings.Contains(key, "len:"):
+				field.validateKeyLen(errValid, key)
+			case strings.Contains(key, "regexp:"):
+				err = field.validateKeyRegexp(key)
+			case strings.Contains(key, "min:"):
+				err = field.validateKeyMinMax(key, true)
+			case strings.Contains(key, "max:"):
+				err = field.validateKeyMinMax(key, false)
+			case strings.Contains(key, "in:"):
+				field.validateKeyIn(errValid, key)
+			default:
+				err = nil
 			}
-			// type int
-			if fl.fieldVal.Kind() == reflect.Int {
-				// Выделение и проверка валидаторов.
-				for _, key := range strings.Split(keys, "|") {
-					switch {
-					case strings.Contains(key, "min:"):
-						err = validateKeyMinMax(fl.fieldVal.Int(), key, true)
-						fmt.Println("!!!result!!!", err)
-					case strings.Contains(key, "max:"):
-						err = validateKeyMinMax(fl.fieldVal.Int(), key, false)
-						fmt.Println("!!!result!!!", err)
-					case strings.Contains(key, "in:"):
-						err = validateKeyIn(fl.fieldVal.Int(), key)
-						fmt.Println("!!!result!!!", err)
-					default:
-						fmt.Println("Неправильный валидатор!!!")
-					}
-					if err != nil {
-						*errValid = append(*errValid, ValidationError{
-							Field: fl.fieldName,
-							Err:   err,
-						})
-					}
-					fmt.Println("errValid:", errValid)
-				}
+			if err != nil {
+				*errValid = append(*errValid, ValidationError{
+					Field: field.fieldName,
+					Err:   err,
+				})
 			}
 		}
 	}
-	return
 }
 
 func Validate(v interface{}) error {
-	var errValid ValidationErrors
+	errValid := ValidationErrors{}
 	valStruct := reflect.ValueOf(v)
-	fmt.Printf("type : %T\n", v)
 	if valStruct.Kind() != reflect.Struct {
-		fmt.Printf("expected a struct, but received %T\n", v)
-		return nil
+		return errValid
 	}
-	fmt.Println("type:", reflect.TypeOf(v))
+
 	typeStruct := valStruct.Type()
-	fmt.Println("NumField:", typeStruct.NumField()) // Кол-во полей
 	for i := 0; i < typeStruct.NumField(); i++ {
-		fmt.Println("reflect.StructField:", typeStruct.Field(i))
-		fmt.Println("reflect.StructField.Name:", typeStruct.Field(i).Name)
-		fmt.Println("reflect.StructField.Tag:", typeStruct.Field(i).Tag)
-		fieldTag{
+		fieldT{
 			fieldName: typeStruct.Field(i).Name,
 			fieldVal:  valStruct.Field(i),
 			tagVal:    typeStruct.Field(i).Tag,
