@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -31,13 +32,14 @@ func ReadDir(dir string) (Environment, error) {
 			continue
 		}
 
-		f, err := os.Open(dir + "/" + file.Name())
+		f, err := os.Open(path.Join(dir, file.Name()))
 		if err != nil {
 			return nil, err
 		}
 
 		info, err := f.Stat()
 		if err != nil {
+			f.Close()
 			return nil, err
 		}
 

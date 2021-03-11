@@ -7,20 +7,21 @@ import (
 	"os/exec"
 )
 
+// Настройка переменных окружения.
+func settingEnv(key, value string, needRemove bool) error {
+	if needRemove {
+		return os.Unsetenv(key)
+	}
+	return os.Setenv(key, value)
+}
+
 // RunCmd runs a command + arguments (cmd) with environment variables from env.
 func RunCmd(cmd []string, env Environment) (returnCode int) {
 	// Подготовка переменных окружения.
 	for key, val := range env {
-		if val.NeedRemove {
-			err := os.Unsetenv(key)
-			if err != nil {
-				return 1
-			}
-		} else {
-			err := os.Setenv(key, val.Value)
-			if err != nil {
-				return 1
-			}
+		err := settingEnv(key, val.Value, val.NeedRemove)
+		if err != nil {
+			return 1
 		}
 	}
 
