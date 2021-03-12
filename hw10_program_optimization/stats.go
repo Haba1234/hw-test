@@ -1,12 +1,14 @@
 package hw10programoptimization
 
 import (
-	"encoding/json"
+	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"regexp"
+	"log"
+	_ "net/http/pprof"
 	"strings"
+
+	"github.com/valyala/fastjson"
 )
 
 type User struct {
@@ -19,48 +21,82 @@ type User struct {
 	Address  string
 }
 
+/*type User struct {
+	ID       int
+	Name     []byte
+	Username []byte
+	Email    []byte
+	Phone    []byte
+	Password []byte
+	Address  []byte
+}*/
+
 type DomainStat map[string]int
 
 func GetDomainStat(r io.Reader, domain string) (DomainStat, error) {
 	u, err := getUsers(r)
+	//fmt.Printf("len: %v \n", u)
 	if err != nil {
 		return nil, fmt.Errorf("get users error: %w", err)
 	}
 	return countDomains(u, domain)
 }
 
-type users [100_000]User
+//type users [100_000]User
 
-func getUsers(r io.Reader) (result users, err error) {
-	content, err := ioutil.ReadAll(r)
-	if err != nil {
-		return
-	}
-
-	lines := strings.Split(string(content), "\n")
-	for i, line := range lines {
-		var user User
-		if err = json.Unmarshal([]byte(line), &user); err != nil {
-			return
+func getUsers(r io.Reader) (result []User, err error) {
+	//i := 0
+	var p fastjson.Parser
+	//user := new(User)
+	var user User
+	//var tmp []User
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		v, err := p.Parse(line)
+		if err != nil {
+			log.Fatalf("cannot parse json: %s", err)
 		}
-		result[i] = user
+		user.ID = v.GetInt("ID")
+		user.Name = string(v.GetStringBytes("Name"))
+		user.Username = string(v.GetStringBytes("Username"))
+		user.Email = string(v.GetStringBytes("Email"))
+		user.Phone = string(v.GetStringBytes("Phone"))
+		user.Password = string(v.GetStringBytes("Password"))
+		user.Address = string(v.GetStringBytes("Address"))
+		/*user.Name 		= v.GetStringBytes("Name")
+		user.Username 	= v.GetStringBytes("Username")
+		user.Email    	= v.GetStringBytes("Email")
+		user.Phone    	= v.GetStringBytes("Phone")
+		user.Password 	= v.GetStringBytes("Password")
+		user.Address  	= v.GetStringBytes("Address")*/
+		result = append(result, user)
+		//result[i] = user
+		//i++
 	}
-	return
+	//fmt.Printf("len: %v \n", len(result))
+	if err := scanner.Err(); err != nil {
+		fmt.Println("reading standard input:", err)
+	}
+
+	return result, nil
 }
 
-func countDomains(u users, domain string) (DomainStat, error) {
+func countDomains(u []User, domain string) (DomainStat, error) {
 	result := make(DomainStat)
-
+	//fmt.Printf("len: %s \n", u[0].Name)
 	for _, user := range u {
-		matched, err := regexp.Match("\\."+domain, []byte(user.Email))
-		if err != nil {
-			return nil, err
+		//fmt.Printf("%s = %s\n", user.Email, []byte(domain))
+		if len(user.Email) == 0 {
+			continue
 		}
-
-		if matched {
-			num := result[strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])]
+		//fmt.Printf("%s = %s\n", user.Email, []byte(domain))
+		if strings.Contains(user.Email, domain) {
+			//if bytes.Contains(user.Email, []byte(domain)) {
+			key := strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])
+			num := result[key]
 			num++
-			result[strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])] = num
+			result[key] = num
 		}
 	}
 	return result, nil
