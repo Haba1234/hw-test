@@ -22,20 +22,23 @@ type ValidationError struct {
 type ValidationErrors []ValidationError
 
 func (v ValidationErrors) Error() string {
-	var errStr string
+	errStr := strings.Builder{}
 	for _, err := range v {
 		// Оставляем только ошибки валидации
 		if errors.Is(err.Err, ErrValidate) {
-			errStr += fmt.Sprintf("Field: %s: %s\n", err.Field, err.Err)
+			errStr.WriteString(fmt.Sprintf("Field: %s: %s\n", err.Field, err.Err))
 		}
 	}
-	return errStr
+	return errStr.String()
 }
 
 type fieldT struct {
 	fieldName string
 	fieldVal  reflect.Value
 	tagVal    reflect.StructTag
+	reDigit   *regexp.Regexp
+	reIn      *regexp.Regexp
+	reRe      *regexp.Regexp
 }
 
 // Добавляет найденные ошибки в слайс.
@@ -62,7 +65,7 @@ func (field fieldT) validateKeyLen(errValid *ValidationErrors, key string) {
 		return
 	}
 
-	valKey, err := strconv.Atoi(regexp.MustCompile(`([0-9]+)`).FindString(key))
+	valKey, err := strconv.Atoi(field.reDigit.FindString(key))
 	if err != nil {
 		field.appendValidateErr(errValid, err)
 		return
@@ -95,7 +98,7 @@ func (field fieldT) validateKeyIn(errValid *ValidationErrors, key string) {
 		return
 	}
 
-	arrayKey := regexp.MustCompile(`(in:|,)`).Split(key, -1)
+	arrayKey := field.reIn.Split(key, -1)
 	if len(arrayKey) < 2 {
 		field.appendValidateErr(errValid, ErrValidateWrong)
 		return
@@ -133,7 +136,7 @@ func (field fieldT) validateKeyIn(errValid *ValidationErrors, key string) {
 // Проверка строки по ключу 'regexp:...'.
 func (field fieldT) validateKeyRegexp(key string) error {
 	if field.fieldVal.Kind() == reflect.String {
-		re := regexp.MustCompile(`[^regexp:].*`).FindString(key)
+		re := field.reRe.FindString(key)
 		result, err := regexp.MatchString(re, field.fieldVal.String())
 		if err != nil {
 			return err
@@ -148,15 +151,15 @@ func (field fieldT) validateKeyRegexp(key string) error {
 // Проверка числа на минимум, максимум Ключи 'min', 'max'.
 // less = true - проверка на минимум.
 func (field fieldT) validateKeyMinMax(key string, less bool) error {
-	if field.fieldVal.Kind() == reflect.Int {
-		valKey, err := strconv.Atoi(regexp.MustCompile(`([0-9]+)`).FindString(key))
-		if err != nil {
-			return err
-		}
-
-		if less && field.fieldVal.Int() < int64(valKey) || !less && field.fieldVal.Int() > int64(valKey) {
-			return ErrValidate
-		}
+	if field.fieldVal.Kind() != reflect.Int {
+		return ErrValidateWrong
+	}
+	valKey, err := strconv.Atoi(field.reDigit.FindString(key))
+	if err != nil {
+		return err
+	}
+	if less && field.fieldVal.Int() < int64(valKey) || !less && field.fieldVal.Int() > int64(valKey) {
+		return ErrValidate
 	}
 	return nil
 }
@@ -164,6 +167,7 @@ func (field fieldT) validateKeyMinMax(key string, less bool) error {
 // Парсим Tag и анализируем с типом поля.
 func (field fieldT) parsing(errValid *ValidationErrors) {
 	var err error
+
 	if keys, ok := field.tagVal.Lookup("validate"); ok && keys != "" {
 		// Выделение и проверка валидаторов.
 		for _, key := range strings.Split(keys, "|") {
@@ -204,7 +208,14 @@ func Validate(v interface{}) error {
 			fieldName: typeStruct.Field(i).Name,
 			fieldVal:  valStruct.Field(i),
 			tagVal:    typeStruct.Field(i).Tag,
+			reDigit:   regexp.MustCompile(`([0-9]+)`),
+			reIn:      regexp.MustCompile(`(in:|,)`),
+			reRe:      regexp.MustCompile(`[^regexp:].*`),
 		}.parsing(&errValid)
 	}
-	return errValid
+
+	if len(errValid) != 0 {
+		return errValid
+	}
+	return nil
 }

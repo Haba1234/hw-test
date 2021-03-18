@@ -58,7 +58,7 @@ func TestValidate(t *testing.T) {
 				Code: 200,
 				Body: "test string",
 			},
-			expectedErr: ValidationErrors{},
+			expectedErr: nil,
 		},
 		{
 			in: User{
@@ -103,7 +103,7 @@ func TestValidate(t *testing.T) {
 				Phones: []string{"01234567891"},
 				meta:   nil,
 			},
-			expectedErr: ValidationErrors{},
+			expectedErr: nil,
 		},
 		{
 			in: App{Version: "0.01"},
@@ -114,7 +114,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			in:          App{Version: "10.01"},
-			expectedErr: ValidationErrors{},
+			expectedErr: nil,
 		},
 		{
 			in: Token{
@@ -122,7 +122,7 @@ func TestValidate(t *testing.T) {
 				Payload:   nil,
 				Signature: nil,
 			},
-			expectedErr: ValidationErrors{},
+			expectedErr: nil,
 		},
 		{
 			in:          "empty",
