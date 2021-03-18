@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"net"
@@ -23,7 +22,6 @@ type telnetClient struct {
 	in      io.ReadCloser
 	out     io.Writer
 	conn    net.Conn
-	ctx     context.Context
 }
 
 func NewTelnetClient(address string, timeout time.Duration, in io.ReadCloser, out io.Writer) TelnetClient {
@@ -36,21 +34,12 @@ func NewTelnetClient(address string, timeout time.Duration, in io.ReadCloser, ou
 }
 
 func (t *telnetClient) Connect() error {
-	//ctx := context.Background()
 	var err error
-	//t.ctx, _ = context.WithTimeout(context.Background(), t.timeout*time.Second)
-	//dialer := &net.Dialer{}
-	//t.conn, err = dialer.DialContext(t.ctx, "tcp", t.address)
-	//dialer.Timeout = 1*time.Millisecond
 	t.conn, err = net.DialTimeout("tcp", t.address, t.timeout)
-	//t.conn, err = net.Dial("tcp", t.address)
 	if err != nil {
 		return fmt.Errorf("cannot connect to %s. Error: %w", t.address, err)
 	}
-	_, err = io.WriteString(os.Stderr, "...Connected to "+t.address+"\n")
-	if err != nil {
-		return fmt.Errorf("cannot write a string. Error: %w", err)
-	}
+	fmt.Fprintln(os.Stderr, "...Connected to", t.address)
 	return nil
 }
 
@@ -58,10 +47,7 @@ func (t *telnetClient) Send() error {
 	scanner := bufio.NewScanner(t.in)
 	for {
 		if !scanner.Scan() {
-			_, err := io.WriteString(os.Stderr, "...EOF\n")
-			if err != nil {
-				return fmt.Errorf("cannot write a string. Error: %w", err)
-			}
+			fmt.Fprintln(os.Stderr, "...EOF")
 			break
 		}
 		str := scanner.Text()
@@ -69,13 +55,9 @@ func (t *telnetClient) Send() error {
 			return fmt.Errorf("error reading from channel %v. Error: %w", t.in, err)
 		}
 
-		_, err := t.conn.Write([]byte(fmt.Sprintf("%s\n", str)))
+		_, err := t.conn.Write([]byte(fmt.Sprintln(str)))
 		if err != nil {
-			_, err := io.WriteString(os.Stderr, "...Connection was closed by peer\n")
-			if err != nil {
-				return fmt.Errorf("cannot write a string. Error: %w", err)
-			}
-			return nil
+			return fmt.Errorf("...Connection was closed by peer")
 		}
 	}
 	return nil
@@ -91,18 +73,14 @@ func (t *telnetClient) Receive() error {
 		if err := scanner.Err(); err != nil {
 			return fmt.Errorf("error reading from channel %v. Error: %w", t.conn, err)
 		}
-		_, err := io.WriteString(t.out, text+"\n")
-		if err != nil {
-			return fmt.Errorf("cannot write a string. Error: %w", err)
-		}
+		fmt.Fprintln(t.out, text)
 	}
 	return nil
 }
 
 func (t *telnetClient) Close() error {
-	err := t.conn.Close()
-	if err != nil {
-		return err
+	if t.conn == nil {
+		return fmt.Errorf("channel nil")
 	}
-	return nil
+	return t.conn.Close()
 }
