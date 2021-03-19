@@ -12,6 +12,7 @@ import (
 var (
 	ErrValidateWrong = errors.New("validate wrong")
 	ErrValidate      = errors.New("validated error")
+	ErrNoStruct      = errors.New("invalid data type")
 	reDigit          = regexp.MustCompile(`([0-9-]+)`)
 	reIn             = regexp.MustCompile(`(in:|,)`)
 	reRe             = regexp.MustCompile(`[^regexp:].*`)
@@ -191,7 +192,7 @@ func Validate(v interface{}) error {
 	errValid := ValidationErrors{}
 	valStruct := reflect.ValueOf(v)
 	if valStruct.Kind() != reflect.Struct {
-		return errValid
+		return ErrNoStruct
 	}
 
 	typeStruct := valStruct.Type()

@@ -126,7 +126,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			in:          "empty",
-			expectedErr: ValidationErrors{},
+			expectedErr: ErrNoStruct,
 		},
 	}
 
