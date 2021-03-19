@@ -12,6 +12,9 @@ import (
 var (
 	ErrValidateWrong = errors.New("validate wrong")
 	ErrValidate      = errors.New("validated error")
+	reDigit          = regexp.MustCompile(`([0-9-]+)`)
+	reIn             = regexp.MustCompile(`(in:|,)`)
+	reRe             = regexp.MustCompile(`[^regexp:].*`)
 )
 
 type ValidationError struct {
@@ -36,23 +39,10 @@ type fieldT struct {
 	fieldName string
 	fieldVal  reflect.Value
 	tagVal    reflect.StructTag
-	reDigit   *regexp.Regexp
-	reIn      *regexp.Regexp
-	reRe      *regexp.Regexp
-}
-
-// Добавляет найденные ошибки в слайс.
-func (field fieldT) appendValidateErr(errValid *ValidationErrors, err error) {
-	if err != nil {
-		*errValid = append(*errValid, ValidationError{
-			Field: field.fieldName,
-			Err:   err,
-		})
-	}
 }
 
 // Проверка строки по ключу 'len:xxx'.
-func (field fieldT) validateKeyLen(errValid *ValidationErrors, key string) {
+func (field fieldT) validateKeyLen(key string) error {
 	slice := reflect.ValueOf([]string{})
 	// определяем тип данных: слайс или нет.
 	switch field.fieldVal.Kind() {
@@ -61,28 +51,27 @@ func (field fieldT) validateKeyLen(errValid *ValidationErrors, key string) {
 	case reflect.Slice:
 		slice = reflect.AppendSlice(slice, field.fieldVal.Slice(0, field.fieldVal.Len()))
 	default:
-		field.appendValidateErr(errValid, ErrValidateWrong)
-		return
+		return ErrValidateWrong
 	}
 
-	valKey, err := strconv.Atoi(field.reDigit.FindString(key))
+	valKey, err := strconv.Atoi(reDigit.FindString(key))
 	if err != nil {
-		field.appendValidateErr(errValid, err)
-		return
+		return err
 	}
 	for i := 0; i < slice.Len(); i++ {
 		v := slice.Index(i)
 		switch {
 		case valKey < 0:
-			field.appendValidateErr(errValid, ErrValidateWrong)
+			return ErrValidateWrong
 		case len(v.String()) != valKey:
-			field.appendValidateErr(errValid, ErrValidate)
+			return ErrValidate
 		}
 	}
+	return nil
 }
 
 // Проверка на вхождение строки в множество строк. Ключ 'in:foo,bar'.
-func (field fieldT) validateKeyIn(errValid *ValidationErrors, key string) {
+func (field fieldT) validateKeyIn(key string) error {
 	slice := reflect.ValueOf([]string{})
 	// определяем тип данных: слайс или нет.
 	switch field.fieldVal.Kind() {
@@ -94,14 +83,12 @@ func (field fieldT) validateKeyIn(errValid *ValidationErrors, key string) {
 	case reflect.Slice:
 		slice = reflect.AppendSlice(slice, field.fieldVal.Slice(0, field.fieldVal.Len()))
 	default:
-		field.appendValidateErr(errValid, ErrValidateWrong)
-		return
+		return ErrValidateWrong
 	}
 
-	arrayKey := field.reIn.Split(key, -1)
+	arrayKey := reIn.Split(key, -1)
 	if len(arrayKey) < 2 {
-		field.appendValidateErr(errValid, ErrValidateWrong)
-		return
+		return ErrValidateWrong
 	}
 	arrayKey = arrayKey[1:]
 
@@ -116,8 +103,7 @@ func (field fieldT) validateKeyIn(errValid *ValidationErrors, key string) {
 		case reflect.Int:
 			valResult = strconv.Itoa(int(val.Int()))
 		default:
-			field.appendValidateErr(errValid, ErrValidateWrong)
-			return
+			return ErrValidateWrong
 		}
 		// Сравниваем значение с ключом.
 		keyOK := true
@@ -128,15 +114,16 @@ func (field fieldT) validateKeyIn(errValid *ValidationErrors, key string) {
 			}
 		}
 		if keyOK {
-			field.appendValidateErr(errValid, ErrValidate)
+			return ErrValidate
 		}
 	}
+	return nil
 }
 
 // Проверка строки по ключу 'regexp:...'.
 func (field fieldT) validateKeyRegexp(key string) error {
 	if field.fieldVal.Kind() == reflect.String {
-		re := field.reRe.FindString(key)
+		re := reRe.FindString(key)
 		result, err := regexp.MatchString(re, field.fieldVal.String())
 		if err != nil {
 			return err
@@ -154,11 +141,16 @@ func (field fieldT) validateKeyMinMax(key string, less bool) error {
 	if field.fieldVal.Kind() != reflect.Int {
 		return ErrValidateWrong
 	}
-	valKey, err := strconv.Atoi(field.reDigit.FindString(key))
+	valKey, err := strconv.Atoi(reDigit.FindString(key))
 	if err != nil {
 		return err
 	}
-	if less && field.fieldVal.Int() < int64(valKey) || !less && field.fieldVal.Int() > int64(valKey) {
+	switch {
+	case valKey < 0:
+		return ErrValidateWrong
+	case less && field.fieldVal.Int() < int64(valKey): // Проверка на min.
+		return ErrValidate
+	case !less && field.fieldVal.Int() > int64(valKey): // Проверка на max.
 		return ErrValidate
 	}
 	return nil
@@ -173,7 +165,7 @@ func (field fieldT) parsing(errValid *ValidationErrors) {
 		for _, key := range strings.Split(keys, "|") {
 			switch {
 			case strings.Contains(key, "len:"):
-				field.validateKeyLen(errValid, key)
+				err = field.validateKeyLen(key)
 			case strings.Contains(key, "regexp:"):
 				err = field.validateKeyRegexp(key)
 			case strings.Contains(key, "min:"):
@@ -181,7 +173,7 @@ func (field fieldT) parsing(errValid *ValidationErrors) {
 			case strings.Contains(key, "max:"):
 				err = field.validateKeyMinMax(key, false)
 			case strings.Contains(key, "in:"):
-				field.validateKeyIn(errValid, key)
+				err = field.validateKeyIn(key)
 			default:
 				err = nil
 			}
@@ -208,9 +200,6 @@ func Validate(v interface{}) error {
 			fieldName: typeStruct.Field(i).Name,
 			fieldVal:  valStruct.Field(i),
 			tagVal:    typeStruct.Field(i).Tag,
-			reDigit:   regexp.MustCompile(`([0-9]+)`),
-			reIn:      regexp.MustCompile(`(in:|,)`),
-			reRe:      regexp.MustCompile(`[^regexp:].*`),
 		}.parsing(&errValid)
 	}
 
