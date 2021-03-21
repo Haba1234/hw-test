@@ -32,13 +32,6 @@ func GetDomainStat(r io.Reader, domain string) (DomainStat, error) {
 type users [100_000]User
 
 func getUsers(r io.Reader) (result users, err error) {
-	/*var json = jsoniter.Config{
-		EscapeHTML:                    	false,
-		OnlyTaggedField: 				true,
-		ObjectFieldMustBeSimpleString: 	true,
-		ValidateJsonRawMessage: 		true,
-	}.Froze()*/
-
 	i := 0
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
