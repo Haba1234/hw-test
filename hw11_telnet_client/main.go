@@ -7,26 +7,20 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"time"
 )
 
 func main() {
-	timeout := flag.String("timeout", "10s", "timeout connection default 10s")
+	timeout := flag.Duration("timeout", 10, "timeout connection default 10s")
 	host := flag.String("host", "127.0.0.1", "name host or ip address")
 	port := flag.String("port", "4242", "port number")
 	flag.Parse()
 
 	outErr := os.Stderr
-	tim, err := time.ParseDuration(*timeout)
+	tc := NewTelnetClient(net.JoinHostPort(*host, *port), *timeout, os.Stdin, os.Stdout)
+	err := tc.Connect()
 	if err != nil {
 		fmt.Fprintln(outErr, err)
-		return
-	}
-	tc := NewTelnetClient(net.JoinHostPort(*host, *port), tim, os.Stdin, os.Stdout)
-	err = tc.Connect()
-	if err != nil {
-		fmt.Fprintln(outErr, err)
-		return
+		os.Exit(1)
 	}
 	defer tc.Close()
 
@@ -36,6 +30,7 @@ func main() {
 		defer stop()
 		if err := tc.Receive(); err != nil {
 			fmt.Fprintln(outErr, err)
+			os.Exit(1)
 		}
 	}()
 
@@ -43,6 +38,7 @@ func main() {
 		defer stop()
 		if err := tc.Send(); err != nil {
 			fmt.Fprintln(outErr, err)
+			os.Exit(1)
 		}
 	}()
 
