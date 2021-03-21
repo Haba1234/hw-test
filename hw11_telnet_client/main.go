@@ -15,11 +15,10 @@ func main() {
 	port := flag.String("port", "4242", "port number")
 	flag.Parse()
 
-	outErr := os.Stderr
 	tc := NewTelnetClient(net.JoinHostPort(*host, *port), *timeout, os.Stdin, os.Stdout)
-	err := tc.Connect()
-	if err != nil {
-		fmt.Fprintln(outErr, err)
+
+	if err := tc.Connect(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 	defer tc.Close()
@@ -29,7 +28,7 @@ func main() {
 	go func() {
 		defer stop()
 		if err := tc.Receive(); err != nil {
-			fmt.Fprintln(outErr, err)
+			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	}()
@@ -37,7 +36,7 @@ func main() {
 	go func() {
 		defer stop()
 		if err := tc.Send(); err != nil {
-			fmt.Fprintln(outErr, err)
+			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	}()
