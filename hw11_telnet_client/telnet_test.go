@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -61,5 +63,88 @@ func TestTelnetClient(t *testing.T) {
 		}()
 
 		wg.Wait()
+	})
+
+	t.Run("test EOF", func(t *testing.T) {
+		reader, writer, err := os.Pipe()
+		if err != nil {
+			panic(err)
+		}
+
+		stdout := os.Stdout
+		stderr := os.Stderr
+		defer func() {
+			os.Stdout = stdout
+			os.Stderr = stderr
+		}()
+
+		os.Stdout = writer
+		os.Stderr = writer
+
+		l, err := net.Listen("tcp", "127.0.0.1:")
+		require.NoError(t, err)
+		defer func() { require.NoError(t, l.Close()) }()
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+
+			var outData bytes.Buffer
+			r, w := io.Pipe()
+
+			timeout, err := time.ParseDuration("5s")
+			require.NoError(t, err)
+
+			tc := NewTelnetClient(l.Addr().String(), timeout, r, &outData)
+			require.NoError(t, tc.Connect())
+			defer func() { require.NoError(t, tc.Close()) }()
+
+			err = w.Close()
+			require.NoError(t, err)
+			err = tc.Send()
+			require.NoError(t, err)
+
+			buf := make([]byte, 1024)
+			n, err := reader.Read(buf)
+			require.NoError(t, err)
+			require.Contains(t, string(buf[:n]), "...EOF")
+		}()
+
+		go func() {
+			defer wg.Done()
+
+			conn, err := l.Accept()
+			require.NoError(t, err)
+			require.NotNil(t, conn)
+			defer func() { require.NoError(t, conn.Close()) }()
+		}()
+
+		wg.Wait()
+	})
+
+	t.Run("test connection failed", func(t *testing.T) {
+		var in io.ReadCloser
+		var out io.Writer
+		address := "google.com:80"
+		timeout := time.Duration(10)
+
+		client := NewTelnetClient(address, timeout, in, out)
+		err := client.Connect()
+		require.Equal(t, "cannot connect to google.com:80. Error: dial tcp: i/o timeout", err.Error())
+	})
+
+	t.Run("missing address", func(t *testing.T) {
+		var in io.ReadCloser
+		var out io.Writer
+		address := ""
+		timeout, err := time.ParseDuration("1s")
+		require.Nil(t, err)
+
+		client := NewTelnetClient(address, timeout, in, out)
+		err = client.Connect()
+		// require.Error(t, client.Connect())
+		require.Equal(t, "cannot connect to . Error: dial tcp: missing address", err.Error())
 	})
 }
