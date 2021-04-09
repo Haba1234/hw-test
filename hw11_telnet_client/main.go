@@ -1,6 +1,45 @@
 package main
 
+import (
+	"context"
+	"flag"
+	"fmt"
+	"net"
+	"os"
+	"os/signal"
+)
+
 func main() {
-	// Place your code here,
-	// P.S. Do not rush to throw context down, think think if it is useful with blocking operation?
+	timeout := flag.Duration("timeout", 10, "timeout connection default 10s")
+	host := flag.String("host", "127.0.0.1", "name host or ip address")
+	port := flag.String("port", "4242", "port number")
+	flag.Parse()
+
+	tc := NewTelnetClient(net.JoinHostPort(*host, *port), *timeout, os.Stdin, os.Stdout)
+
+	if err := tc.Connect(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	defer tc.Close()
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+
+	go func() {
+		defer stop()
+		if err := tc.Receive(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}()
+
+	go func() {
+		defer stop()
+		if err := tc.Send(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
 }
