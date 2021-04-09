@@ -1,0 +1,17 @@
+title = "MyCalendar configuration"
+
+[logger]
+level = "DEBUG"
+path = "./bin/logfile.log"
+
+[storage]
+type = "sql"
+host = "localhost"
+portDB = "5432"
+user = "postgres"
+password = "123qwe"
+SSLMode = false
+
+[httpServer]
+address = "localhost"
+port = "8090"

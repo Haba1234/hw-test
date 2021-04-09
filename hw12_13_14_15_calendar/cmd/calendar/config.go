@@ -1,20 +1,44 @@
 package main
 
-// При желании конфигурацию можно вынести в internal/config.
-// Организация конфига в main принуждает нас сужать API компонентов, использовать
-// при их конструировании только необходимые параметры, а также уменьшает вероятность циклической зависимости.
+import (
+	"context"
+
+	"github.com/heetch/confita"
+	"github.com/heetch/confita/backend/file"
+)
+
 type Config struct {
-	Logger LoggerConf
-	// TODO
+	Logger  LoggerConf
+	Storage StorageConf
+	Server  ServerConf
 }
 
 type LoggerConf struct {
-	Level string
-	// TODO
+	Level string `config:"level"`
+	Path  string `config:"path"`
 }
 
-func NewConfig() Config {
-	return Config{}
+type StorageConf struct {
+	Type     string `config:"type"`
+	Host     string `config:"host"`
+	PortDB   string `config:"portDB"`
+	User     string `config:"user"`
+	Password string `config:"password"`
+	SSLMode  bool   `config:"SSLMode"`
 }
 
-// TODO
+type ServerConf struct {
+	Address string `config:"address"`
+	Port    string `config:"port"`
+}
+
+func NewConfig(path string) (*Config, error) {
+	cfg := &Config{}
+	loader := confita.NewLoader(
+		file.NewBackend(path),
+	)
+	if err := loader.Load(context.Background(), cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
