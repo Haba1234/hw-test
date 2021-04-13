@@ -24,21 +24,42 @@ type StorageConf struct {
 	PortDB   string `config:"portDB"`
 	User     string `config:"user"`
 	Password string `config:"password"`
-	SSLMode  bool   `config:"SSLMode"`
+	SSLMode  string `config:"SSLMode"`
 }
 
 type ServerConf struct {
-	Address string `config:"address"`
-	Port    string `config:"port"`
+	Address  string `config:"address"`
+	HTTPPort string `config:"httpPort"`
+	GRPCPort string `config:"grpcPort"`
 }
 
 func NewConfig(path string) (*Config, error) {
-	cfg := &Config{}
+	// default values
+	cfg := Config{
+		Logger: LoggerConf{
+			Level: "INFO",
+			Path:  "./bin/logfile.log",
+		},
+		Storage: StorageConf{
+			Type:     "memory",
+			Host:     "localhost",
+			PortDB:   "5432",
+			User:     "postgres",
+			Password: "",
+			SSLMode:  "false",
+		},
+		Server: ServerConf{
+			Address:  "localhost",
+			HTTPPort: "8080",
+			GRPCPort: "8090",
+		},
+	}
+
 	loader := confita.NewLoader(
 		file.NewBackend(path),
 	)
-	if err := loader.Load(context.Background(), cfg); err != nil {
+	if err := loader.Load(context.Background(), &cfg); err != nil {
 		return nil, err
 	}
-	return cfg, nil
+	return &cfg, nil
 }

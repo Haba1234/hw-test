@@ -10,8 +10,9 @@ host = "localhost"
 portDB = "5432"
 user = "postgres"
 password = "123qwe"
-SSLMode = false
+SSLMode = "disable"
 
-[httpServer]
+[server]
 address = "localhost"
-port = "8090"
+httpPort = "8080"
+grpcPort = "8090"

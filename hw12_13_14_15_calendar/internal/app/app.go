@@ -10,7 +10,7 @@ import (
 
 type App struct {
 	logger  Logger
-	storage Storage
+	storage storage.Storage
 }
 
 type Logger interface {
@@ -20,30 +20,93 @@ type Logger interface {
 	Debug(msg, pkg string)
 }
 
-type Storage interface {
-	CreateEvent(ctx context.Context, event *storage.Event) (uuid.UUID, error)
-	UpdateEvent(ctx context.Context, event *storage.Event) error
-	DeleteEvent(ctx context.Context, id uuid.UUID) error
-	GetEventID(ctx context.Context, id uuid.UUID) (*storage.Event, error)
-	GetListEvents(ctx context.Context) ([]*storage.Event, error)
-	GetListEventsDay(ctx context.Context, day time.Time) ([]*storage.Event, error)
-	GetListEventsWeek(ctx context.Context, beginDate time.Time) ([]*storage.Event, error)
-	GetListEventsMonth(ctx context.Context, beginDate time.Time) ([]*storage.Event, error)
+type Event struct {
+	ID           uuid.UUID     `json:"id"`            // уникальный идентификатор события.
+	Title        string        `json:"title"`         // Заголовок - короткий текст.
+	DateTime     time.Time     `json:"start_date"`    // Дата и время события.
+	Duration     time.Duration `json:"duration"`      // Длительность события (или дата и время окончания).
+	Description  string        `json:"description"`   // Описание события - длинный текст, опционально.
+	UserID       uuid.UUID     `json:"user_id"`       // ID пользователя, владельца события.
+	NotifyBefore int64         `json:"notify_before"` // За сколько времени высылать уведомление, опционально.
 }
 
-func New(logger Logger, storage Storage) *App {
+type Application interface {
+	Connect(ctx context.Context, connect string) error
+	Close(ctx context.Context) error
+	CreateEvent(ctx context.Context, event *Event) (uuid.UUID, error)
+	UpdateEvent(ctx context.Context, event *Event) error
+	DeleteEvent(ctx context.Context, id uuid.UUID) error
+	GetEventID(ctx context.Context, id uuid.UUID) (*Event, error)
+	GetListEvents(ctx context.Context) ([]Event, error)
+	GetListEventsDay(ctx context.Context, day time.Time) ([]Event, error)
+	GetListEventsWeek(ctx context.Context, beginDate time.Time) ([]Event, error)
+	GetListEventsMonth(ctx context.Context, beginDate time.Time) ([]Event, error)
+}
+
+func New(logger Logger, storage storage.Storage) *App {
 	return &App{
 		logger:  logger,
 		storage: storage,
 	}
 }
 
-func (a *App) CreateEvent(ctx context.Context, event *storage.Event) (uuid.UUID, error) {
-	return a.storage.CreateEvent(ctx, event)
+func (a *App) Connect(ctx context.Context, dsn string) error {
+	return a.storage.Connect(ctx, dsn)
 }
 
-func (a *App) UpdateEvent(ctx context.Context, event *storage.Event) error {
-	return a.storage.UpdateEvent(ctx, event)
+func (a *App) Close(ctx context.Context) error {
+	a.logger.Info("storage closing...")
+	return a.storage.Close(ctx)
+}
+
+func (a *App) CreateEvent(ctx context.Context, event *Event) (uuid.UUID, error) {
+	if event.Title == "" {
+		return uuid.Nil, storage.ErrEventStruct
+	}
+	if time.Now().After(event.DateTime) {
+		return uuid.Nil, storage.ErrEventStruct
+	}
+	if event.Duration <= 0 {
+		return uuid.Nil, storage.ErrEventStruct
+	}
+	if event.Description == "" {
+		return uuid.Nil, storage.ErrEventStruct
+	}
+
+	return a.storage.CreateEvent(ctx, &storage.Event{
+		ID:           uuid.New(),
+		Title:        event.Title,
+		DateTime:     event.DateTime,
+		Duration:     event.Duration,
+		Description:  event.Description,
+		UserID:       event.UserID,
+		NotifyBefore: event.NotifyBefore,
+	})
+}
+
+func (a *App) UpdateEvent(ctx context.Context, event *Event) error {
+	if event.Title == "" {
+		return storage.ErrEventStruct
+	}
+	if time.Now().After(event.DateTime) {
+		return storage.ErrEventStruct
+	}
+	if event.Duration <= 0 {
+		return storage.ErrEventStruct
+	}
+	if event.Description == "" {
+		return storage.ErrEventStruct
+	}
+
+	return a.storage.UpdateEvent(ctx, &storage.Event{
+		ID:           event.ID,
+		Title:        event.Title,
+		DateTime:     event.DateTime,
+		Duration:     event.Duration,
+		Description:  event.Description,
+		UserID:       event.UserID,
+		NotifyBefore: event.NotifyBefore,
+	})
 }
 
 func (a *App) DeleteEvent(ctx context.Context, id uuid.UUID) error {
@@ -54,34 +117,18 @@ func (a *App) GetEventID(ctx context.Context, id uuid.UUID) (*storage.Event, err
 	return a.storage.GetEventID(ctx, id)
 }
 
-func (a *App) GetListEvents(ctx context.Context) ([]*storage.Event, error) {
+func (a *App) GetListEvents(ctx context.Context) ([]storage.Event, error) {
 	return a.storage.GetListEvents(ctx)
 }
 
-func (a *App) GetListEventsDay(ctx context.Context, day time.Time) ([]*storage.Event, error) {
+func (a *App) GetListEventsDay(ctx context.Context, day time.Time) ([]storage.Event, error) {
 	return a.storage.GetListEventsDay(ctx, day)
 }
 
-func (a *App) GetListEventsWeek(ctx context.Context, beginDate time.Time) ([]*storage.Event, error) {
+func (a *App) GetListEventsWeek(ctx context.Context, beginDate time.Time) ([]storage.Event, error) {
 	return a.storage.GetListEventsWeek(ctx, beginDate)
 }
 
-func (a *App) GetListEventsMonth(ctx context.Context, beginDate time.Time) ([]*storage.Event, error) {
+func (a *App) GetListEventsMonth(ctx context.Context, beginDate time.Time) ([]storage.Event, error) {
 	return a.storage.GetListEventsMonth(ctx, beginDate)
-}
-
-func (a *App) Info(msg string) {
-	a.logger.Info(msg)
-}
-
-func (a *App) Warn(msg string) {
-	a.logger.Warn(msg)
-}
-
-func (a *App) Error(msg string) {
-	a.logger.Error(msg)
-}
-
-func (a *App) Debug(msg, pkg string) {
-	a.logger.Debug(msg, pkg)
 }
