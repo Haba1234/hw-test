@@ -12,6 +12,8 @@ import (
 	"github.com/Haba1234/hw-test/hw12_13_14_15_calendar/internal/storage"
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -63,7 +65,7 @@ func (s *server) Stop(ctx context.Context) error {
 func (s server) CreateEvent(ctx context.Context, event *Event) (*CreateEventResponse, error) {
 	userID, err := uuid.Parse(event.UserId)
 	if err != nil {
-		return nil, fmt.Errorf("error to create event: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("error to create event: %v", err))
 	}
 
 	e := app.Event{
@@ -77,7 +79,7 @@ func (s server) CreateEvent(ctx context.Context, event *Event) (*CreateEventResp
 
 	id, err := s.app.CreateEvent(ctx, &e)
 	if err != nil {
-		return nil, fmt.Errorf("error to create event: %w", err)
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("error to create event: %v", err))
 	}
 
 	return &CreateEventResponse{Id: id.String()}, nil
@@ -86,12 +88,12 @@ func (s server) CreateEvent(ctx context.Context, event *Event) (*CreateEventResp
 func (s server) UpdateEvent(ctx context.Context, event *Event) (*emptypb.Empty, error) {
 	ID, err := uuid.Parse(event.Id)
 	if err != nil {
-		return nil, fmt.Errorf("error to update event: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("error to update event: %v", err))
 	}
 
 	userID, err := uuid.Parse(event.UserId)
 	if err != nil {
-		return nil, fmt.Errorf("error to update event: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("error to update event: %v", err))
 	}
 
 	e := app.Event{
@@ -106,7 +108,7 @@ func (s server) UpdateEvent(ctx context.Context, event *Event) (*emptypb.Empty, 
 
 	err = s.app.UpdateEvent(ctx, &e)
 	if err != nil {
-		return nil, fmt.Errorf("error to update event: %w", err)
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("error to update event: %v", err))
 	}
 
 	return &emptypb.Empty{}, nil
@@ -115,12 +117,12 @@ func (s server) UpdateEvent(ctx context.Context, event *Event) (*emptypb.Empty, 
 func (s server) DeleteEvent(ctx context.Context, req *DeleteEventRequest) (*emptypb.Empty, error) {
 	ID, err := uuid.Parse(req.Id)
 	if err != nil {
-		return nil, fmt.Errorf("error to delete event: %w", err)
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("error to delete event: %v", err))
 	}
 
 	err = s.app.DeleteEvent(ctx, ID)
 	if err != nil {
-		return nil, fmt.Errorf("error to delete event: %w", err)
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("error to delete event: %v", err))
 	}
 
 	return &emptypb.Empty{}, nil
@@ -129,7 +131,7 @@ func (s server) DeleteEvent(ctx context.Context, req *DeleteEventRequest) (*empt
 func (s server) GetListEvents(ctx context.Context) (*GetListEventsResponse, error) {
 	listEvents, err := s.app.GetListEvents(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("error to get evens list: %w", err)
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("error to get evens list: %v", err))
 	}
 
 	return &GetListEventsResponse{Events: convertStorageEvToGrpcEv(listEvents)}, nil
@@ -138,7 +140,7 @@ func (s server) GetListEvents(ctx context.Context) (*GetListEventsResponse, erro
 func (s server) GetListEventsDay(ctx context.Context, req *GetListEventsDayRequest) (*GetListEventsDayResponse, error) {
 	listEvents, err := s.app.GetListEventsDay(ctx, req.StartDate.AsTime())
 	if err != nil {
-		return nil, fmt.Errorf("error to get evens list day: %w", err)
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("error to get evens list day: %v", err))
 	}
 
 	return &GetListEventsDayResponse{Events: convertStorageEvToGrpcEv(listEvents)}, nil
@@ -147,7 +149,7 @@ func (s server) GetListEventsDay(ctx context.Context, req *GetListEventsDayReque
 func (s server) GetListEventsWeek(ctx context.Context, req *GetListEventsWeekRequest) (*GetListEventsWeekResponse, error) {
 	listEvents, err := s.app.GetListEventsWeek(ctx, req.StartDate.AsTime())
 	if err != nil {
-		return nil, fmt.Errorf("error to get evens list week: %w", err)
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("error to get evens list week: %v", err))
 	}
 
 	return &GetListEventsWeekResponse{Events: convertStorageEvToGrpcEv(listEvents)}, nil
@@ -156,7 +158,7 @@ func (s server) GetListEventsWeek(ctx context.Context, req *GetListEventsWeekReq
 func (s server) GetListEventsMonth(ctx context.Context, req *GetListEventsMonthRequest) (*GetListEventsMonthResponse, error) {
 	listEvents, err := s.app.GetListEventsMonth(ctx, req.StartDate.AsTime())
 	if err != nil {
-		return nil, fmt.Errorf("error to get evens list month: %w", err)
+		return nil, status.Errorf(codes.Internal, fmt.Sprintf("error to get evens list month: %v", err))
 	}
 
 	return &GetListEventsMonthResponse{Events: convertStorageEvToGrpcEv(listEvents)}, nil
