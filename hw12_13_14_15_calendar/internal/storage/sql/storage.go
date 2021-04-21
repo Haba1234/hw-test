@@ -17,7 +17,8 @@ type Storage struct {
 }
 
 func New() *Storage {
-	return &Storage{}
+	var db *sqlx.DB
+	return &Storage{db: db}
 }
 
 func (s *Storage) Connect(ctx context.Context, dsn string) error {
@@ -92,8 +93,8 @@ func (s *Storage) GetEventByDate(ctx context.Context, day time.Time) (*storage.E
 	return event, nil
 }
 
-func (s *Storage) GetListEvents(ctx context.Context) ([]*storage.Event, error) {
-	var events []*storage.Event
+func (s *Storage) GetListEvents(ctx context.Context) ([]storage.Event, error) {
+	var events []storage.Event
 	err := s.db.SelectContext(ctx, &events, `SELECT * FROM events`)
 	if err != nil {
 		return nil, err
@@ -101,8 +102,8 @@ func (s *Storage) GetListEvents(ctx context.Context) ([]*storage.Event, error) {
 	return events, err
 }
 
-func (s *Storage) GetListEventsDay(ctx context.Context, day time.Time) ([]*storage.Event, error) {
-	var events []*storage.Event
+func (s *Storage) GetListEventsDay(ctx context.Context, day time.Time) ([]storage.Event, error) {
+	var events []storage.Event
 	err := s.db.SelectContext(ctx, &events, `SELECT * FROM events WHERE start_date BETWEEN $1 AND $1 + (interval '1d')`, day)
 	if err != nil {
 		return nil, err
@@ -110,8 +111,8 @@ func (s *Storage) GetListEventsDay(ctx context.Context, day time.Time) ([]*stora
 	return events, err
 }
 
-func (s *Storage) GetListEventsWeek(ctx context.Context, beginDate time.Time) ([]*storage.Event, error) {
-	var events []*storage.Event
+func (s *Storage) GetListEventsWeek(ctx context.Context, beginDate time.Time) ([]storage.Event, error) {
+	var events []storage.Event
 	err := s.db.SelectContext(ctx, &events,
 		`SELECT * FROM events WHERE start_date BETWEEN $1 AND $1 + (interval '7 weeks')`, beginDate)
 	if err != nil {
@@ -120,8 +121,8 @@ func (s *Storage) GetListEventsWeek(ctx context.Context, beginDate time.Time) ([
 	return events, nil
 }
 
-func (s *Storage) GetListEventsMonth(ctx context.Context, beginDate time.Time) ([]*storage.Event, error) {
-	var events []*storage.Event
+func (s *Storage) GetListEventsMonth(ctx context.Context, beginDate time.Time) ([]storage.Event, error) {
+	var events []storage.Event
 	err := s.db.SelectContext(ctx, &events,
 		`SELECT * FROM events WHERE start_date BETWEEN $1 AND $1 + (interval '1 months')`, beginDate)
 	if err != nil {

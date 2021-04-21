@@ -2,6 +2,72 @@ syntax = "proto3";
 
 package event;
 
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "../grpc;internalgrpc";
+
 message Event {
-    // TODO
+  string id  = 1;
+  string title = 2;
+  google.protobuf.Timestamp start_date = 3;
+  google.protobuf.Duration duration = 4;
+  string description = 5;
+  string user_id = 6;
+  int64 notify_before = 7;
+}
+
+service Calendar {
+  rpc CreateEvent(CreateEventRequest) returns (CreateEventResponse);
+  rpc UpdateEvent(EventUpdateRequest) returns (google.protobuf.Empty);
+  rpc DeleteEvent(DeleteEventRequest) returns (google.protobuf.Empty);
+  rpc GetListEvents(google.protobuf.Empty) returns (GetListEventsResponse);
+  rpc GetListEventsDay(GetListEventsDayRequest) returns (GetListEventsDayResponse);
+  rpc GetListEventsWeek(GetListEventsWeekRequest) returns (GetListEventsWeekResponse);
+  rpc GetListEventsMonth(GetListEventsMonthRequest) returns (GetListEventsMonthResponse);
+}
+
+message CreateEventRequest {
+  Event event = 1;
+}
+
+message CreateEventResponse {
+  string id = 1;
+}
+
+message EventUpdateRequest {
+  Event event = 1;
+}
+
+message DeleteEventRequest {
+  string id = 1;
+}
+
+message GetListEventsResponse {
+  repeated Event events = 1;
+}
+
+message GetListEventsDayRequest {
+  google.protobuf.Timestamp start_date = 1;
+}
+
+message GetListEventsDayResponse {
+  repeated Event events = 1;
+}
+
+message GetListEventsWeekRequest {
+  google.protobuf.Timestamp start_date = 1;
+}
+
+message GetListEventsWeekResponse {
+  repeated Event events = 1;
+}
+
+message GetListEventsMonthRequest {
+  google.protobuf.Timestamp start_date = 1;
+}
+
+message GetListEventsMonthResponse {
+  repeated Event events = 1;
 }
