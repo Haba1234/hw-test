@@ -15,7 +15,7 @@ const (
 
 func TestPipeline(t *testing.T) {
 	// Stage generator
-	g := func(name string, f func(v interface{}) interface{}) Stage {
+	g := func(name string, f func(v interface{}) interface{}) Stage { //nolint:unparam
 		return func(in In) Out {
 			out := make(Bi)
 			go func() {
@@ -103,13 +103,13 @@ func TestPipeline(t *testing.T) {
 			close(in)
 		}()
 
-		result := make([]string, 0, 10)
+		result := make([]int, 0, 10)
 		stages = []Stage{}
 
 		for s := range ExecutePipeline(in, done, stages...) {
-			result = append(result, s.(string))
+			result = append(result, s.(int))
 		}
 
-		require.Len(t, result, 0)
+		require.Equal(t, data, result)
 	})
 }
